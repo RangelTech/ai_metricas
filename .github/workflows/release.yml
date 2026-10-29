@@ -1,0 +1,28 @@
+name: Release
+# Empacota o Umami e o Postgres (imagens oficiais fixadas por digest) e publica UMA release com 4 arquivos:
+#   umami.image.tar.gz  release-manifest.umami.json  umami-db.image.tar.gz  release-manifest.umami-db.json
+# NAO faz deploy: so o vps_rt_infra implanta.
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Versao (ex.: v0.1.0); cria a tag no commit atual"
+        required: true
+permissions:
+  contents: write
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Empacotar o Umami
+        run: bash scripts/build_release.sh umami "${{ inputs.version }}" "${GITHUB_SHA}"
+      - name: Empacotar o Postgres
+        run: bash scripts/build_release.sh umami-db "${{ inputs.version }}" "${GITHUB_SHA}"
+      - name: GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          V="${{ inputs.version }}"
+          FILES="umami.image.tar.gz release-manifest.umami.json umami-db.image.tar.gz release-manifest.umami-db.json"
+          gh release create "$V" $FILES --title "$V" --notes "Imagens oficiais empacotadas e fixadas por digest (images.env). Deploy: somente vps_rt_infra." --target "${GITHUB_SHA}" || gh release upload "$V" $FILES --clobber
